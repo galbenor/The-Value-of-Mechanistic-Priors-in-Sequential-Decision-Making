@@ -1,0 +1,6 @@
+# Exact versions the reported numbers were produced with. The unpinned dependencies live in
+# `pyproject.toml` (`pip install -e .`); install this file to reproduce the numbers
+# bit-for-bit, since a different numpy can move a table cell in the last printed digit.
+matplotlib==3.10.9
+numpy==2.4.6
+scipy==1.17.1

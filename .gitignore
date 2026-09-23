@@ -1,0 +1,9 @@
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+outputs/
+outputs_table_on_slice/
+info_delete/
