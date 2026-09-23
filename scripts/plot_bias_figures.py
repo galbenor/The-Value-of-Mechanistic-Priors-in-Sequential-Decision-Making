@@ -52,7 +52,7 @@ def model_distance_figure(out: Path, b_by_gamma: dict) -> None:
     i = int(np.argsort(cl_app)[4000])
     bsa, vmax = float(coh.bsa[i]), float(coh.vmax[i])
 
-    s_coh = F.sample_patients(spec, 6000, np.random.default_rng(2024))
+    s_coh = F.sample_patients(spec, 2000, np.random.default_rng(2024))
     _, s_conc = F.arm_exposures(spec, s_coh)
 
     doses = np.linspace(spec.dose_levels[0] - 100, spec.dose_levels[-1] + 100, 90)
