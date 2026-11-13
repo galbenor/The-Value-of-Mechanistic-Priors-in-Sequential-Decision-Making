@@ -128,8 +128,21 @@ def shape_matrix(reward_obs: np.ndarray, pi_star: np.ndarray, K: int) -> np.ndar
     return np.clip(np.asarray(rows, float), 0.02, 0.98)
 
 
+def model_shape_matrix(spec: F.FolfoxSpec) -> np.ndarray:
+    """Q[k, j] from the deployed one-compartment model alone -> (K, K).
+
+    If arm k is a patient's optimum, the model puts the exposure at dose D_k at the centre of
+    the therapeutic window. Dose proportionality then puts the exposure at arm j at
+    target * D_j / D_k, and the between-cycle noise gives the probability that it lands in
+    the window. No study patient, no optimal arm and no counterfactual outcome is used.
+    """
+    target = np.sqrt(spec.auc_lo * spec.auc_hi)
+    d = spec.dose_levels
+    return np.clip(arm_reward_probs(spec, target * d[None, :] / d[:, None]), 0.02, 0.98)
+
+
 def run_study(spec: F.FolfoxSpec, auc: np.ndarray,
-              rng: np.random.Generator, runin) -> dict:
+              rng: np.random.Generator, runin, q_source: str = "oracle") -> dict:
     """The offline calibration study -> {"Q", "table", "R_mech"}.
 
     Everything the hybrid knows before it treats anyone comes out of here: the returned dict
@@ -143,8 +156,15 @@ def run_study(spec: F.FolfoxSpec, auc: np.ndarray,
     p_study = arm_reward_probs(spec, auc)
     pi_star = p_study.argmax(axis=1)
 
-    # One binary outcome per (patient, arm): what a dose-ranging study records.
-    Q = shape_matrix((rng.random((ns, K)) < p_study).astype(float), pi_star, K)
+    if q_source == "oracle":
+        # One binary outcome per (patient, arm), grouped by the true optimal arm: the
+        # construction of the submitted paper, and the default.
+        Q = shape_matrix((rng.random((ns, K)) < p_study).astype(float), pi_star, K)
+    elif q_source == "model":
+        # The model's own dose response: needs no outcome data.
+        Q = model_shape_matrix(spec)
+    else:
+        raise ValueError(f"q_source must be 'model' or 'oracle', got {q_source!r}")
 
     return {"Q": Q, "table": hybrid_prior_table(pi_star, runin.pi_hat, K),
             "R_mech": information_quantities(pi_star, runin.pi_hat, K)["R_mech"]}

@@ -84,7 +84,7 @@ def study_cohort(spec: F.FolfoxSpec, n_study: int, study_seed: int,
 
 def deploy_model(spec: F.FolfoxSpec, sc: StudyCohort, study_seed: int, frac: float = 1.0,
                  side: str = "low", rs: RunInSpec | None = None,
-                 with_table: bool = True) -> Deployment:
+                 with_table: bool = True, q_source: str = "oracle") -> Deployment:
     """Calibrate the model on a slice of `sc`, run the study lead-in, fit the prior table.
 
     `frac` / `side` are the miscalibration axis: the deployed model's population clearance is
@@ -98,23 +98,28 @@ def deploy_model(spec: F.FolfoxSpec, sc: StudyCohort, study_seed: int, frac: flo
     population model; without it the table is fitted once, at gamma = 1, and carried into
     every slice. Only the table differs between the two:
     `run_study`'s Q matrix is drawn from its own generator and does not depend on `runin`.
+
+    `q_source` is passed to `run_study`: "oracle" (the default, the submitted construction)
+    or "model" (Q from the one-compartment model, no outcome data).
     """
     rs = RunInSpec(n_cycles=1) if rs is None else rs
     cl_pop_hat, gamma = F.calibrate(spec, sc.coh, sc.conc[:, spec.bsa_arm],
                                     frac=frac, side=side)
     state = run_runin(spec, sc.coh, sc.auc, sc.conc, sc.p, sc.pi_star, sc.renv, gamma, rs)
-    study = (run_study(spec, sc.auc, np.random.default_rng(study_seed + 777), runin=state)
+    study = (run_study(spec, sc.auc, np.random.default_rng(study_seed + 777), runin=state,
+                       q_source=q_source)
              if with_table else None)
     return Deployment(cl_pop_hat=cl_pop_hat, gamma=gamma, state=state, study=study)
 
 
 def build_study(spec: F.FolfoxSpec, n_study: int, study_seed: int, frac: float = 1.0,
                 side: str = "low", rs: RunInSpec | None = None,
-                with_table: bool = True) -> tuple[StudyCohort, Deployment]:
+                with_table: bool = True,
+                q_source: str = "oracle") -> tuple[StudyCohort, Deployment]:
     """`study_cohort` followed by `deploy_model`: the whole pre-trial side."""
     rs = RunInSpec(n_cycles=1) if rs is None else rs
     sc = study_cohort(spec, n_study, study_seed, rs)
-    return sc, deploy_model(spec, sc, study_seed, frac, side, rs, with_table)
+    return sc, deploy_model(spec, sc, study_seed, frac, side, rs, with_table, q_source)
 
 
 def eval_cohort(spec: F.FolfoxSpec, n: int, seed: int, n_cycles: int,
